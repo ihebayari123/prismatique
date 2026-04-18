@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Satacenter Gabes Library</title>
+  <style>
+    :root {
+      --bg: #0c1716;
+      --bg-2: #17332f;
+      --card: #f7f1e8;
+      --card-2: #efe5d5;
+      --line: #dacdb9;
+      --text: #17312d;
+      --muted: #66726d;
+      --primary: #0e6b5c;
+      --primary-2: #12483f;
+      --accent: #efb66a;
+      --danger: #8b3d17;
+      --white: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #edf4f0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(239, 182, 106, 0.18), transparent 24%),
+        linear-gradient(135deg, var(--bg), var(--bg-2) 55%, #215147);
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .hero {
+      display: flex;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .hero-card, .hero-side, .panel, .chat-panel {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+      border-radius: 24px;
+    }
+
+    .hero-card {
+      flex: 1.2;
+      padding: 24px;
+    }
+
+    .hero-side {
+      flex: 0.8;
+      padding: 22px;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      font-size: clamp(2rem, 3vw, 3.4rem);
+      margin-bottom: 10px;
+    }
+
+    .subtle {
+      color: #d8e3de;
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr) 420px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      padding: 18px;
+    }
+
+    .light {
+      color: var(--text);
+      background: var(--card);
+      border: 0;
+    }
+
+    .search-box, .upload-box, .selector, .composer {
+      background: var(--card);
+      color: var(--text);
+      border-radius: 22px;
+      padding: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.03);
+    }
+
+    .search-box, .upload-box, .selector {
+      margin-bottom: 14px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px 14px;
+      font: inherit;
+      color: var(--text);
+      background: #fffdf8;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .primary-btn { background: var(--primary); color: var(--white); }
+    .secondary-btn { background: var(--card-2); color: var(--text); }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .status { color: var(--muted); font-size: 0.92rem; }
+    .error { color: var(--danger); font-weight: 700; }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 620px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .item {
+      border-radius: 18px;
+      padding: 14px;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+    }
+
+    .item:hover {
+      transform: translateY(-1px);
+    }
+
+    .item.library {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .item.library.active {
+      background: rgba(239, 182, 106, 0.16);
+      border-color: rgba(239, 182, 106, 0.36);
+    }
+
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(14, 107, 92, 0.12);
+      color: var(--primary-2);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .detail-panel {
+      background: var(--card);
+      color: var(--text);
+      border-radius: 28px;
+      overflow: hidden;
+    }
+
+    .detail-header {
+      padding: 22px 22px 12px;
+      border-bottom: 1px solid var(--line);
+      background:
+        radial-gradient(circle at top right, rgba(239, 182, 106, 0.22), transparent 28%),
+        linear-gradient(180deg, #f7f1e8, #f2e8d9);
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--line);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.1rem;
+      margin-bottom: 4px;
+    }
+
+    .detail-content {
+      padding: 18px 22px 22px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .section-card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 16px;
+      background: #fffdfa;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .quick-actions button {
+      background: #e7efe9;
+      color: var(--primary-2);
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 10px;
+    }
+
+    .source-card {
+      border-radius: 16px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .chat-panel {
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 18px 18px 0;
+    }
+
+    .chat-window {
+      background:
+        radial-gradient(circle at top right, rgba(239, 182, 106, 0.14), transparent 24%),
+        linear-gradient(180deg, #f7f1e8, #efe4d5);
+      min-height: 640px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .messages {
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: auto;
+      flex: 1;
+    }
+
+    .msg {
+      max-width: 88%;
+      border-radius: 20px;
+      padding: 14px 16px;
+      line-height: 1.58;
+      white-space: pre-wrap;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: var(--primary);
+      color: var(--white);
+      border-bottom-right-radius: 7px;
+    }
+
+    .msg.assistant {
+      align-self: flex-start;
+      background: #fff;
+      color: var(--text);
+      border-bottom-left-radius: 7px;
+    }
+
+    .sources {
+      display: grid;
+      gap: 10px;
+    }
+
+    .composer {
+      margin: 0 18px 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .muted-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    a.inline {
+      color: #fff;
+    }
+
+    @media (max-width: 1180px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        flex-direction: column;
+      }
+
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <h1>Satacenter Gabes</h1>
+        <p class="subtle">
+          A searchable digital library for Gabes projects with RAG-powered answers.
+          Use it to explore opportunities, understand project goals, inspect budgets, and reduce the time needed for research, investment screening, or decision support.
+        </p>
+        <div class="actions">
+          <a class="inline" href="/docs"><button type="button" class="secondary-btn">Open API Docs</button></a>
+          <a class="inline" href="/projects"><button type="button" class="secondary-btn">Projects JSON</button></a>
+          <a class="inline" href="/health"><button type="button" class="secondary-btn">Health Check</button></a>
+        </div>
+      </div>
+      <div class="hero-side">
+        <h3>How to exploit RAG here</h3>
+        <ul class="muted-list">
+          <li>Browse projects as a digital library, not only as chat.</li>
+          <li>Search across all projects to find the most relevant initiatives.</li>
+          <li>Open one project and use quick questions to extract objective, budget, or execution details.</li>
+          <li>Upload new PDF or DOCX files to grow the knowledge base.</li>
+        </ul>
+        <p class="subtle" style="margin-top: 14px;">
+          Open this same interface from another PC on the same Wi-Fi with:
+          <strong id="server-url"></strong>
+        </p>
+      </div>
+    </section>
+
+    <section class="layout">
+      <aside class="panel">
+        <div class="search-box">
+          <h3>Library Search</h3>
+          <input id="library-search-input" type="text" placeholder="Search themes like tourism, agriculture, employment, sustainability..." />
+          <div class="actions">
+            <button id="library-search-btn" type="button" class="primary-btn">Search Library</button>
+            <button id="library-reset-btn" type="button" class="secondary-btn">Show All</button>
+          </div>
+          <p id="library-status" class="status">Browse all projects or search the library by theme.</p>
+        </div>
+
+        <div class="upload-box">
+          <h3>Add Documents</h3>
+          <input id="file-input" type="file" accept=".pdf,.doc,.docx" multiple />
+          <div class="actions">
+            <button id="upload-btn" type="button" class="primary-btn">Upload and Index</button>
+            <button id="refresh-btn" type="button" class="secondary-btn">Refresh</button>
+          </div>
+          <p id="upload-status" class="status">Flexible: new PDF and DOCX files become searchable after indexing.</p>
+        </div>
+
+        <h3>Project Catalog</h3>
+        <div id="project-list" class="list"></div>
+      </aside>
+
+      <main class="detail-panel">
+        <div class="detail-header">
+          <div class="title-row">
+            <div>
+              <div class="pill">Project Library</div>
+              <h2 id="detail-title" style="margin: 10px 0 0;">Select a project</h2>
+            </div>
+          </div>
+          <p id="detail-summary" class="status" style="margin-top: 12px;">
+            Choose a project from the library to see its summary, sample sources, and ask targeted questions.
+          </p>
+          <div class="meta-grid">
+            <div class="stat">
+              <strong id="stat-docs">-</strong>
+              <span class="status">Documents</span>
+            </div>
+            <div class="stat">
+              <strong id="stat-chunks">-</strong>
+              <span class="status">Indexed Chunks</span>
+            </div>
+            <div class="stat">
+              <strong id="stat-pages">-</strong>
+              <span class="status">Pages</span>
+            </div>
+          </div>
+        </div>
+        <div class="detail-content">
+          <div class="section-card">
+            <h3>Quick Research Actions</h3>
+            <p class="status">Use these to exploit the RAG faster in a decision-support workflow.</p>
+            <div class="quick-actions">
+              <button type="button" data-question="What is the objective of this project?">Project Objective</button>
+              <button type="button" data-question="What budget and dates are mentioned for this project?">Budget and Dates</button>
+              <button type="button" data-question="Who are the stakeholders and beneficiaries of this project?">Stakeholders</button>
+              <button type="button" data-question="What execution actions or opportunities are described?">Execution Plan</button>
+              <button type="button" data-question="What social, economic, or environmental impact is expected?">Expected Impact</button>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <h3>Project Documents</h3>
+            <div id="detail-documents" class="status">No project selected.</div>
+          </div>
+
+          <div class="section-card">
+            <h3>Sample Sources</h3>
+            <div id="detail-sources" class="source-grid"></div>
+          </div>
+        </div>
+      </main>
+
+      <section class="chat-panel">
+        <div class="chat-window">
+          <div class="chat-header">
+            <h3>Decision Assistant Chat</h3>
+            <p class="status">Ask grounded questions about the selected project or all projects.</p>
+          </div>
+          <div class="selector" style="margin: 0 18px 14px;">
+            <label for="project-select" style="display:block; font-weight:700; margin-bottom:8px;">Chat target</label>
+            <select id="project-select">
+              <option value="">All Gabes projects</option>
+            </select>
+          </div>
+          <div id="messages" class="messages"></div>
+          <div class="composer">
+            <textarea id="question-input" placeholder="Ask about a project, an opportunity, a budget, an action plan, or the best initiative for a theme."></textarea>
+            <div class="actions">
+              <button id="send-btn" type="button" class="primary-btn">Ask Question</button>
+              <button id="clear-btn" type="button" class="secondary-btn">Clear Chat</button>
+            </div>
+            <div id="chat-status" class="status"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script>
+    const serverUrl = document.getElementById("server-url");
+    const librarySearchInput = document.getElementById("library-search-input");
+    const librarySearchBtn = document.getElementById("library-search-btn");
+    const libraryResetBtn = document.getElementById("library-reset-btn");
+    const libraryStatus = document.getElementById("library-status");
+    const projectList = document.getElementById("project-list");
+    const projectSelect = document.getElementById("project-select");
+    const detailTitle = document.getElementById("detail-title");
+    const detailSummary = document.getElementById("detail-summary");
+    const statDocs = document.getElementById("stat-docs");
+    const statChunks = document.getElementById("stat-chunks");
+    const statPages = document.getElementById("stat-pages");
+    const detailDocuments = document.getElementById("detail-documents");
+    const detailSources = document.getElementById("detail-sources");
+    const questionInput = document.getElementById("question-input");
+    const sendBtn = document.getElementById("send-btn");
+    const clearBtn = document.getElementById("clear-btn");
+    const chatStatus = document.getElementById("chat-status");
+    const messagesEl = document.getElementById("messages");
+    const fileInput = document.getElementById("file-input");
+    const uploadBtn = document.getElementById("upload-btn");
+    const uploadStatus = document.getElementById("upload-status");
+    const refreshBtn = document.getElementById("refresh-btn");
+
+    let projects = [];
+    let selectedProject = "";
+    let history = [
+      {
+        role: "assistant",
+        content: "Welcome. Choose a project in the library or ask across all projects. I can help with objectives, budgets, beneficiaries, execution actions, or investment-oriented research."
+      }
+    ];
+
+    serverUrl.textContent = `${window.location.origin}/playground`;
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function renderMessages() {
+      messagesEl.innerHTML = "";
+      for (const message of history) {
+        const bubble = document.createElement("div");
+        bubble.className = `msg ${message.role === "user" ? "user" : "assistant"}`;
+        bubble.textContent = message.content;
+        messagesEl.appendChild(bubble);
+
+        if (message.role === "assistant" && Array.isArray(message.sources) && message.sources.length) {
+          const wrap = document.createElement("div");
+          wrap.className = "sources";
+          for (const source of message.sources.slice(0, 3)) {
+            const card = document.createElement("div");
+            card.className = "source-card";
+            card.innerHTML = `
+              <strong>${escapeHtml(source.project || source.filename || "Source")}</strong>
+              <div class="status">page ${source.page ?? "-"} | score ${Number(source.score ?? 0).toFixed(2)}</div>
+              <div style="margin-top: 8px;">${escapeHtml(source.snippet || "")}</div>
+            `;
+            wrap.appendChild(card);
+          }
+          messagesEl.appendChild(wrap);
+        }
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function updateProjectSelect() {
+      projectSelect.innerHTML = `<option value="">All Gabes projects</option>`;
+      for (const project of projects) {
+        const option = document.createElement("option");
+        option.value = project.project;
+        option.textContent = `${project.project} - ${project.document_count} doc(s)`;
+        if (project.project === selectedProject) {
+          option.selected = true;
+        }
+        projectSelect.appendChild(option);
+      }
+    }
+
+    function renderProjectList(items, activeProject = selectedProject) {
+      projectList.innerHTML = "";
+      if (!items.length) {
+        projectList.innerHTML = `<div class="status">No projects found.</div>`;
+        return;
+      }
+
+      for (const item of items) {
+        const card = document.createElement("div");
+        card.className = `item library ${item.project === activeProject ? "active" : ""}`;
+        card.innerHTML = `
+          <div class="title-row">
+            <strong>${escapeHtml(item.project)}</strong>
+            ${item.score !== undefined ? `<span class="pill">score ${Number(item.score).toFixed(2)}</span>` : ""}
+          </div>
+          <div class="status" style="margin-top: 6px;">
+            ${item.document_count} doc(s)${item.chunk_count ? ` | ${item.chunk_count} chunk(s)` : ""}
+          </div>
+          <div style="margin-top: 8px; line-height: 1.55;">${escapeHtml(item.snippet || item.summary || "")}</div>
+        `;
+        card.addEventListener("click", () => selectProject(item.project));
+        projectList.appendChild(card);
+      }
+    }
+
+    async function loadProjects() {
+      libraryStatus.textContent = "Loading full project catalog...";
+      try {
+        const response = await fetch("/projects");
+        const data = await response.json();
+        projects = data.projects || [];
+        updateProjectSelect();
+        renderProjectList(projects);
+        libraryStatus.textContent = `${projects.length} project(s) available in the library.`;
+      } catch (error) {
+        libraryStatus.innerHTML = `<span class="error">Could not load projects.</span>`;
+      }
+    }
+
+    async function selectProject(projectName) {
+      selectedProject = projectName || "";
+      updateProjectSelect();
+      renderProjectList(projects, selectedProject);
+
+      if (!selectedProject) {
+        detailTitle.textContent = "All projects";
+        detailSummary.textContent = "Search the library or choose one project for focused details.";
+        statDocs.textContent = "-";
+        statChunks.textContent = "-";
+        statPages.textContent = "-";
+        detailDocuments.textContent = "Select one project to inspect its documents.";
+        detailSources.innerHTML = "";
+        return;
+      }
+
+      detailTitle.textContent = selectedProject;
+      detailSummary.textContent = "Loading project detail...";
+
+      try {
+        const response = await fetch(`/projects/${encodeURIComponent(selectedProject)}`);
+        const data = await response.json();
+        detailTitle.textContent = data.project;
+        detailSummary.textContent = data.summary || "No summary generated yet for this project.";
+        statDocs.textContent = data.document_count ?? "-";
+        statChunks.textContent = data.chunk_count ?? "-";
+        statPages.textContent = data.page_count ?? "-";
+        detailDocuments.textContent = (data.documents || []).join(", ") || "No document metadata available.";
+        detailSources.innerHTML = "";
+        for (const source of data.sample_sources || []) {
+          const card = document.createElement("div");
+          card.className = "source-card";
+          card.innerHTML = `
+            <strong>${escapeHtml(source.filename)}</strong>
+            <div class="status">page ${source.page ?? "-"} | chunk ${source.chunk_index ?? "-"}</div>
+            <div style="margin-top: 8px;">${escapeHtml(source.snippet || "")}</div>
+          `;
+          detailSources.appendChild(card);
+        }
+      } catch (error) {
+        detailSummary.innerHTML = `<span class="error">Could not load project detail.</span>`;
+      }
+    }
+
+    async function searchLibrary() {
+      const query = librarySearchInput.value.trim();
+      if (!query) {
+        renderProjectList(projects, selectedProject);
+        libraryStatus.textContent = `${projects.length} project(s) available in the library.`;
+        return;
+      }
+
+      libraryStatus.textContent = "Searching the project library...";
+      try {
+        const response = await fetch("/library/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, top_k: 10 })
+        });
+        const data = await response.json();
+        const results = data.results || [];
+        renderProjectList(results, selectedProject);
+        libraryStatus.textContent = `${results.length} result(s) for "${query}".`;
+      } catch (error) {
+        libraryStatus.innerHTML = `<span class="error">Library search failed.</span>`;
+      }
+    }
+
+    async function askQuestion(prefilledQuestion = null) {
+      const message = (prefilledQuestion || questionInput.value).trim();
+      if (!message) {
+        chatStatus.innerHTML = `<span class="error">Write a question first.</span>`;
+        return;
+      }
+
+      const project = projectSelect.value || selectedProject || null;
+      history.push({ role: "user", content: message });
+      renderMessages();
+      questionInput.value = "";
+      sendBtn.disabled = true;
+      chatStatus.textContent = "Thinking with RAG...";
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            project,
+            top_k: 5,
+            history: history.map(({ role, content }) => ({ role, content }))
+          })
+        });
+        const data = await response.json();
+        history.push({
+          role: "assistant",
+          content: data.answer || "No grounded answer was generated, but the sources below may still help.",
+          sources: data.sources || []
+        });
+        renderMessages();
+        chatStatus.textContent = data.llm_error ? data.llm_error : "Answer ready.";
+      } catch (error) {
+        chatStatus.innerHTML = `<span class="error">Chat request failed.</span>`;
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    async function uploadFiles() {
+      const files = fileInput.files;
+      if (!files || !files.length) {
+        uploadStatus.innerHTML = `<span class="error">Choose at least one PDF or DOCX file.</span>`;
+        return;
+      }
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("files", file);
+      }
+
+      uploadBtn.disabled = true;
+      uploadStatus.textContent = "Uploading and indexing files...";
+      try {
+        const response = await fetch("/ingest", { method: "POST", body: formData });
+        const data = await response.json();
+        uploadStatus.textContent = `${(data.ingested || []).length} file(s) indexed successfully.`;
+        fileInput.value = "";
+        await loadProjects();
+      } catch (error) {
+        uploadStatus.innerHTML = `<span class="error">Upload failed.</span>`;
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    }
+
+    librarySearchBtn.addEventListener("click", searchLibrary);
+    libraryResetBtn.addEventListener("click", () => {
+      librarySearchInput.value = "";
+      renderProjectList(projects, selectedProject);
+      libraryStatus.textContent = `${projects.length} project(s) available in the library.`;
+    });
+    refreshBtn.addEventListener("click", loadProjects);
+    uploadBtn.addEventListener("click", uploadFiles);
+    sendBtn.addEventListener("click", () => askQuestion());
+    clearBtn.addEventListener("click", () => {
+      history = [
+        {
+          role: "assistant",
+          content: "Welcome. Choose a project in the library or ask across all projects. I can help with objectives, budgets, beneficiaries, execution actions, or investment-oriented research."
+        }
+      ];
+      renderMessages();
+      chatStatus.textContent = "";
+    });
+    projectSelect.addEventListener("change", () => {
+      selectProject(projectSelect.value);
+    });
+    questionInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        askQuestion();
+      }
+    });
+    document.querySelectorAll("[data-question]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const template = button.getAttribute("data-question") || "";
+        askQuestion(template);
+      });
+    });
+
+    renderMessages();
+    loadProjects();
+  </script>
+</body>
+</html>

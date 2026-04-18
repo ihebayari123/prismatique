@@ -1,0 +1,13 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+pydantic==2.8.2
+pypdf==4.3.1
+python-docx==1.1.2
+numpy>=2.1.0,<3
+requests==2.32.3
+# BM25 fallback (pure Python) when embeddings aren't configured
+rank-bm25==0.2.2
+
+# Optional: only needed if you want OpenAI embeddings/answers
+openai==1.40.6
