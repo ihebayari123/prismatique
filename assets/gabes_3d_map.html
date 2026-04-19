@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gabès Digital Twin — Tunisia</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a1628; overflow: hidden; font-family: 'Georgia', serif; }
+  #canvas-container { width: 100vw; height: 100vh; }
+  canvas { display: block; }
+
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10;
+  }
+
+  #top-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: linear-gradient(to bottom, rgba(10,22,40,0.92) 0%, transparent 100%);
+    padding: 18px 28px 40px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+  }
+
+  #city-title {
+    color: #fff;
+    letter-spacing: 0.12em;
+  }
+
+  #city-title h1 {
+    font-size: 28px; font-weight: 400;
+    text-transform: uppercase; letter-spacing: 0.3em;
+    color: #f0d080;
+    text-shadow: 0 0 30px rgba(240,208,128,0.4);
+  }
+
+  #city-title p {
+    font-size: 11px; color: #8ab4d4; letter-spacing: 0.25em;
+    text-transform: uppercase; margin-top: 4px;
+  }
+
+  #coords {
+    text-align: right; color: #5a8aaa; font-size: 10px;
+    letter-spacing: 0.12em; line-height: 1.8;
+    font-family: 'Courier New', monospace;
+  }
+
+  #landmark-panel {
+    position: absolute; right: 20px; top: 90px;
+    background: rgba(5,15,30,0.85);
+    border: 1px solid rgba(240,208,128,0.2);
+    border-radius: 4px; padding: 14px 16px; width: 210px;
+    pointer-events: all;
+  }
+
+  #landmark-panel h3 {
+    color: #f0d080; font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 10px;
+    border-bottom: 1px solid rgba(240,208,128,0.15); padding-bottom: 8px;
+  }
+
+  .landmark-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0; cursor: pointer; transition: all 0.2s;
+    border-radius: 3px;
+  }
+
+  .landmark-item:hover { background: rgba(240,208,128,0.08); padding-left: 4px; }
+
+  .landmark-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .landmark-item span {
+    color: #c8d8e8; font-size: 11px; letter-spacing: 0.05em;
+  }
+
+  #info-tooltip {
+    position: absolute; background: rgba(5,15,30,0.95);
+    border: 1px solid rgba(240,208,128,0.4);
+    border-radius: 4px; padding: 12px 14px;
+    color: #fff; font-size: 12px; min-width: 180px;
+    display: none; pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  #info-tooltip h4 { color: #f0d080; margin-bottom: 5px; font-size: 13px; }
+  #info-tooltip p { color: #8ab4d4; font-size: 11px; line-height: 1.5; }
+
+  #controls-hint {
+    position: absolute; bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(5,15,30,0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px; padding: 8px 18px;
+    color: #6a8aaa; font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* Legend */
+  #legend {
+    position: absolute; bottom: 24px; right: 20px;
+    background: rgba(5,15,30,0.8);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px; padding: 10px 14px;
+  }
+  #legend h4 { color: #f0d080; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 7px; }
+  .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+  .legend-swatch { width: 14px; height: 8px; border-radius: 2px; }
+  .legend-row span { color: #7a9ab8; font-size: 10px; }
+
+  /* Loading */
+  #loading {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: #05101e;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100; transition: opacity 0.8s;
+  }
+  #loading h2 {
+    color: #f0d080; font-size: 22px; letter-spacing: 0.3em;
+    text-transform: uppercase; font-weight: 400; margin-bottom: 8px;
+  }
+  #loading p { color: #5a8aaa; font-size: 12px; letter-spacing: 0.2em; margin-bottom: 30px; }
+  #progress-bar {
+    width: 200px; height: 2px; background: rgba(255,255,255,0.1);
+    border-radius: 2px; overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%; background: #f0d080;
+    width: 0%; transition: width 0.3s; border-radius: 2px;
+  }
+
+  /* Map overlay */
+  #map-overlay {
+    position: fixed; inset: 0;
+    background: rgba(6, 14, 28, 0.88);
+    display: none; align-items: center; justify-content: center;
+    z-index: 120;
+    backdrop-filter: blur(10px);
+  }
+  #map-card {
+    width: min(94vw, 980px); max-height: 88vh;
+    background: rgba(10, 18, 35, 0.96);
+    border: 1px solid rgba(240,208,128,0.25);
+    border-radius: 18px; padding: 24px;
+    box-shadow: 0 26px 80px rgba(0,0,0,0.45);
+    overflow: hidden;
+  }
+  #map-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 18px; margin-bottom: 18px;
+  }
+  #map-header h3 {
+    color: #f0d080; font-size: 14px; letter-spacing: 0.3em; text-transform: uppercase;
+  }
+  #map-header p {
+    color: #8ab4d4; font-size: 11px; letter-spacing: 0.18em; margin: 0;
+  }
+  #map-close {
+    color: #f0d080; cursor: pointer; font-size: 18px;
+    background: rgba(240,208,128,0.1); padding: 8px 12px; border-radius: 999px;
+  }
+  #map-graphic {
+    display: grid; grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 18px; align-items: start;
+  }
+  .map-left-column {
+    min-width: 0;
+  }
+  #city-map {
+    width: 100%; height: 560px; border-radius: 16px;
+    position: relative;
+    background:
+      radial-gradient(circle at 83% 20%, rgba(106,177,222,0.24), transparent 22%),
+      radial-gradient(circle at 28% 68%, rgba(111,158,92,0.22), transparent 20%),
+      linear-gradient(180deg, #081327 0%, #0e2240 44%, #0a1629 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  #city-map svg {
+    width: 100%; height: 100%; display: block;
+  }
+  .map-marker { cursor: default; }
+  .map-label {
+    fill: #d8e8f8; font-size: 10px; font-family: 'Courier New', monospace;
+    letter-spacing: 0.06em;
+  }
+  .map-label-secondary {
+    fill: #84b5d8; font-size: 8px; font-family: 'Courier New', monospace;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .map-coast-label {
+    fill: rgba(138,180,212,0.82); font-size: 15px; font-family: 'Georgia', serif;
+    letter-spacing: 0.1em;
+  }
+  .map-outline {
+    fill: rgba(215,188,128,0.92);
+    stroke: #f0d080;
+    stroke-width: 3;
+  }
+  .map-relief {
+    fill: none;
+    stroke: rgba(106,72,40,0.28);
+    stroke-width: 1.6;
+  }
+  .map-coast-glow {
+    fill: none;
+    stroke: rgba(128,206,255,0.35);
+    stroke-width: 20;
+    stroke-linecap: round;
+  }
+  .map-anchor {
+    stroke: rgba(255,255,255,0.75);
+    stroke-width: 1;
+    opacity: 0.72;
+  }
+  .map-insight-pin {
+    cursor: pointer;
+  }
+  .map-insight-ring {
+    opacity: 0.18;
+  }
+  .map-insight-symbol {
+    stroke: rgba(255,255,255,0.92);
+    stroke-width: 1.8;
+  }
+  #map-pin-tooltip {
+    position: absolute;
+    z-index: 4;
+    min-width: 220px;
+    max-width: 290px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(6, 15, 28, 0.96);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: none;
+    pointer-events: auto;
+  }
+  #map-pin-tooltip h5 {
+    color: #eef5fc;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+  #map-pin-tooltip .tooltip-kicker {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  #map-pin-tooltip p {
+    color: #9fc0dc;
+    font-size: 10px;
+    line-height: 1.55;
+    margin-bottom: 8px;
+  }
+  #map-pin-tooltip a {
+    color: #f0d080;
+    font-size: 10px;
+    text-decoration: none;
+    display: inline-block;
+    margin-right: 8px;
+    margin-bottom: 4px;
+  }
+  .map-source-row {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .map-source-row span {
+    display: block;
+    color: #6f98b8;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .map-open {
+    pointer-events: all;
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-top: 16px; padding: 10px 14px;
+    border-radius: 999px; cursor: pointer;
+    color: #f0d080; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    border: 1px solid rgba(240,208,128,0.22);
+    background: rgba(5,15,30,0.7);
+  }
+  .map-open:hover {
+    background: rgba(240,208,128,0.12);
+  }
+  #map-registry {
+    min-height: 560px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+    padding: 18px 16px;
+    overflow: auto;
+  }
+  #map-registry h4 {
+    color: #f0d080; font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  #map-registry p {
+    color: #87a8c5; font-size: 10px; line-height: 1.6; margin-bottom: 14px;
+  }
+  .map-location-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .map-location-item:first-of-type {
+    border-top: 0;
+    padding-top: 2px;
+  }
+  .map-location-dot {
+    width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+  }
+  .map-location-text strong {
+    display: block; color: #eef5fc; font-size: 11px; font-weight: 400; letter-spacing: 0.03em;
+  }
+  .map-location-text span {
+    display: block; color: #7ea5c8; font-size: 10px; line-height: 1.5; margin-top: 2px;
+  }
+  .map-location-item[data-pin-id] {
+    cursor: pointer;
+  }
+  .map-location-item[data-pin-id]:hover {
+    background: rgba(255,255,255,0.03);
+  }
+  #map-legend {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;
+  }
+  .legend-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    color: #b8d4f0; font-size: 11px; letter-spacing: 0.12em;
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  @media (max-width: 980px) {
+    #map-card {
+      padding: 18px;
+    }
+    #map-graphic {
+      grid-template-columns: 1fr;
+    }
+    #city-map {
+      height: 480px;
+    }
+    #map-registry {
+      min-height: 0;
+      max-height: 240px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h2>Gabès</h2>
+  <p>33°53'N · 10°06'E · Tunisia</p>
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+</div>
+
+<div id="canvas-container"></div>
+
+<div id="map-overlay" aria-hidden="true">
+  <div id="map-card">
+    <div id="map-header">
+      <div>
+        <h3>Gabès City Map</h3>
+        <p>Press ESC to close</p>
+      </div>
+      <div id="map-close" onclick="toggleMap(false)">✕</div>
+    </div>
+    <div id="map-graphic">
+      <div id="city-map">
+        <svg viewBox="0 0 860 560" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="waterGlow" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#4c86b1" stop-opacity="0.85" />
+              <stop offset="100%" stop-color="#193c5e" stop-opacity="0.42" />
+            </linearGradient>
+            <linearGradient id="landGlow" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#f8e3a3" stop-opacity="0.95" />
+              <stop offset="100%" stop-color="#b79261" stop-opacity="0.88" />
+            </linearGradient>
+            <radialGradient id="coastShine" cx="0.15" cy="0.25" r="0.7">
+              <stop offset="0%" stop-color="#fef8e2" stop-opacity="0.7" />
+              <stop offset="100%" stop-color="#f0d080" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="860" height="560" fill="#0a1326" rx="16" />
+          <path d="M220,520 C205,495 200,465 202,430 C195,395 202,365 215,335 C235,300 260,285 295,265 C330,250 370,240 415,232 C465,226 512,230 548,242 C580,252 610,270 635,295 C656,325 675,360 685,399 C690,430 692,465 686,498 C676,530 645,548 608,553 C560,560 510,560 460,556 C420,552 385,548 350,540 C320,532 290,526 260,520 C240,518 230,520 220,520 Z"
+            fill="url(#landGlow)" stroke="#f0d080" stroke-width="4" opacity="0.95" />
+          <path d="M542,246 C570,250 605,268 626,292 C642,314 650,342 650,372"
+            fill="none" stroke="url(#waterGlow)" stroke-width="22" stroke-linecap="round" opacity="0.68" />
+          <path d="M552,258 C582,266 612,286 626,312" fill="none" stroke="#aad4f8" stroke-width="6" stroke-linecap="round" opacity="0.7" />
+          <path d="M278,312 C308,290 342,280 380,272" fill="none" stroke="#d8e8f8" stroke-width="5" opacity="0.45" stroke-dasharray="10 8" />
+          <path d="M410,242 C440,240 468,246 495,258" fill="none" stroke="#f8e3a3" stroke-width="3" opacity="0.55" />
+          <path d="M250,518 C280,505 318,498 360,496 C400,494 442,497 484,506" fill="none" stroke="#d9c18d" stroke-width="2" opacity="0.35" />
+          <circle cx="320" cy="242" r="10" fill="#f7d97d" opacity="0.95" />
+          <circle cx="560" cy="262" r="10" fill="#4fc3f7" opacity="0.95" />
+          <circle cx="210" cy="320" r="9" fill="#81c784" opacity="0.95" />
+          <circle cx="600" cy="290" r="9" fill="#ff8a65" opacity="0.95" />
+          <circle cx="370" cy="275" r="8" fill="#ce93d8" opacity="0.95" />
+          <circle cx="280" cy="285" r="8" fill="#ffb74d" opacity="0.95" />
+          <g fill="url(#coastShine)" opacity="0.75">
+            <path d="M550,260 C565,270 590,285 620,310 C640,328 650,350 648,372" />
+          </g>
+          <g class="map-marker">
+            <circle cx="320" cy="242" r="4" fill="#ffffff" />
+            <text x="335" y="244" class="map-label">Grande Mosquée</text>
+          </g>
+          <g class="map-marker">
+            <circle cx="560" cy="262" r="4" fill="#ffffff" />
+            <text x="575" y="264" class="map-label">Port</text>
+          </g>
+          <g class="map-marker">
+            <circle cx="210" cy="320" r="4" fill="#ffffff" />
+            <text x="225" y="322" class="map-label">Oasis</text>
+          </g>
+          <g class="map-marker">
+            <circle cx="600" cy="290" r="4" fill="#ffffff" />
+            <text x="615" y="292" class="map-label">GCT</text>
+          </g>
+          <g class="map-marker">
+            <circle cx="370" cy="275" r="4" fill="#ffffff" />
+            <text x="385" y="277" class="map-label">Avenue</text>
+          </g>
+          <g class="map-marker">
+            <circle cx="280" cy="285" r="4" fill="#ffffff" />
+            <text x="295" y="287" class="map-label">Médina</text>
+          </g>
+          <g fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.55">
+            <path d="M320,242 C335,260 370,270 400,275" />
+            <path d="M210,320 C255,305 285,290 320,242" />
+            <path d="M560,262 C520,275 470,278 420,276" />
+          </g>
+          <text x="598" y="130" fill="#8ab4d4" font-size="14" font-family="Courier New, monospace" opacity="0.75">Gulf of Gabès</text>
+        </svg>
+      </div>
+      <div id="map-legend">
+        <div class="legend-pill"><span class="legend-dot" style="background:#f0d080"></span>Landmarks</div>
+        <div class="legend-pill"><span class="legend-dot" style="background:#4fc3f7"></span>Port</div>
+        <div class="legend-pill"><span class="legend-dot" style="background:#81c784"></span>Oasis</div>
+        <div class="legend-pill"><span class="legend-dot" style="background:#ff8a65"></span>Industry</div>
+        <div class="legend-pill"><span class="legend-dot" style="background:#ce93d8"></span>Main Avenue</div>
+        <div class="legend-pill"><span class="legend-dot" style="background:#ffb74d"></span>Medina</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="top-bar">
+    <div id="city-title">
+      <h1>Gabès</h1>
+      <p>Digital Twin · Governorate of Gabès · Tunisia</p>
+    </div>
+    <div id="coords">
+      LAT 33.8828° N<br>
+      LON 10.0982° E<br>
+      ALT 5m MSL<br>
+      <span style="color:#f0d080">● LIVE</span>
+    </div>
+  </div>
+
+  <div id="landmark-panel">
+    <h3>Landmarks</h3>
+    <div class="landmark-item" onclick="focusLandmark(0)">
+      <div class="landmark-dot" style="background:#f0d080"></div>
+      <span>Grande Mosquée de Gabès</span>
+    </div>
+    <div class="landmark-item" onclick="focusLandmark(1)">
+      <div class="landmark-dot" style="background:#4fc3f7"></div>
+      <span>Port de Gabès</span>
+    </div>
+    <div class="landmark-item" onclick="focusLandmark(2)">
+      <div class="landmark-dot" style="background:#81c784"></div>
+      <span>Oasis de Chenini</span>
+    </div>
+    <div class="landmark-item" onclick="focusLandmark(3)">
+      <div class="landmark-dot" style="background:#ff8a65"></div>
+      <span>Complexe Chimique GCT</span>
+    </div>
+    <div class="landmark-item" onclick="focusLandmark(4)">
+      <div class="landmark-dot" style="background:#ce93d8"></div>
+      <span>Avenue Habib Bourguiba</span>
+    </div>
+    <div class="landmark-item" onclick="focusLandmark(5)">
+      <div class="landmark-dot" style="background:#ffb74d"></div>
+      <span>Médina de Gabès</span>
+    </div>
+  </div>
+
+  <div id="info-tooltip">
+    <h4 id="tooltip-title">Building</h4>
+    <p id="tooltip-desc">Click for details</p>
+  </div>
+
+  <div id="controls-hint">
+    🖱 Drag to orbit · Scroll to zoom · Click landmarks to focus
+  </div>
+
+  <div id="legend">
+    <h4>Layer</h4>
+    <div class="legend-row"><div class="legend-swatch" style="background:#c4a882"></div><span>Residential</span></div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#8d7355"></div><span>Commercial</span></div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#f0d080"></div><span>Landmarks</span></div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#2e7d6b"></span>Oasis / Green</span></div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#1a4a7a"></div><span>Sea / Water</span></div>
+    <div class="legend-row"><div class="legend-swatch" style="background:#888"></div><span>Industrial</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// GABÈS DIGITAL TWIN — Three.js Production Simulation
+// Coordinate system: local metres from city centre (33.8828N, 10.0982E)
+// Scale: 1 unit = 1 metre (world units match real distances)
+// ═══════════════════════════════════════════════════════════════════════
+
+const WORLD_SCALE = 0.5; // visual scale factor
+
+// ── Scene Setup ────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+// ── Camera ─────────────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 1, 8000);
+camera.position.set(200, 300, 400);
+camera.lookAt(0, 0, 0);
+
+// ── Fog / Atmosphere ───────────────────────────────────────────────────
+scene.fog = new THREE.FogExp2(0xb8cfe8, 0.0008);
+scene.background = new THREE.Color(0x7ab0d4);
+
+// ── Lighting ───────────────────────────────────────────────────────────
+// Ambient (sky bounce)
+const ambientLight = new THREE.AmbientLight(0xfff5e0, 0.45);
+scene.add(ambientLight);
+
+// Sun (afternoon position over Gabès — southwest)
+const sunLight = new THREE.DirectionalLight(0xfff0cc, 1.4);
+sunLight.position.set(-300, 500, 200);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 10;
+sunLight.shadow.camera.far = 2000;
+sunLight.shadow.camera.left = -600;
+sunLight.shadow.camera.right = 600;
+sunLight.shadow.camera.top = 600;
+sunLight.shadow.camera.bottom = -600;
+sunLight.shadow.bias = -0.001;
+scene.add(sunLight);
+
+// Fill light (sky)
+const skyFill = new THREE.DirectionalLight(0xa8c8e8, 0.3);
+skyFill.position.set(100, 200, -300);
+scene.add(skyFill);
+
+// Hemisphere
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0xd4b896, 0.25);
+scene.add(hemiLight);
+
+// ── Texture Loader & Helpers ───────────────────────────────────────────
+const loader = new THREE.TextureLoader();
+
+// Procedural sand texture (when no real satellite)
+function createSandTexture(w, h, tint) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  // base colour
+  ctx.fillStyle = tint || '#c8a87a';
+  ctx.fillRect(0, 0, 512, 512);
+  // noise grains
+  for (let i = 0; i < 18000; i++) {
+    const x = Math.random()*512, y = Math.random()*512;
+    const v = Math.floor(Math.random()*40 - 20);
+    const r = parseInt(tint.slice(1,3)||'c8', 16) + v;
+    const g = parseInt(tint.slice(3,5)||'a8', 16) + v;
+    const b = parseInt(tint.slice(5,7)||'7a', 16) + v;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(x, y, 1.5, 1.5);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(w||8, h||8);
+  return tex;
+}
+
+// Procedural ground: satellite-like tile (mixed arid urban)
+function createGroundTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024; canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+
+  // ── Base: warm arid ground ──
+  const baseGrad = ctx.createLinearGradient(0, 0, 1024, 1024);
+  baseGrad.addColorStop(0.0, '#c4a878');
+  baseGrad.addColorStop(0.3, '#bfa06a');
+  baseGrad.addColorStop(0.6, '#c8a87a');
+  baseGrad.addColorStop(1.0, '#d4b88a');
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  // ── Road network outlines (approximate OSM layout) ──
+  ctx.strokeStyle = 'rgba(80,65,45,0.5)';
+  ctx.lineWidth = 5;
+  // Major east-west (Ave Bourguiba)
+  ctx.beginPath(); ctx.moveTo(0, 510); ctx.lineTo(1024, 510); ctx.stroke();
+  // Major north-south
+  ctx.beginPath(); ctx.moveTo(512, 0); ctx.lineTo(512, 1024); ctx.stroke();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(80,65,45,0.3)';
+  ctx.beginPath(); ctx.moveTo(0, 350); ctx.lineTo(700, 300); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(300, 0); ctx.lineTo(350, 500); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(600, 500); ctx.lineTo(1024, 450); ctx.stroke();
+
+  // ── Urban blocks (beige/tan patches) ──
+  const blocks = [
+    [100, 100, 250, 180], [400, 80, 300, 160], [700, 50, 280, 200],
+    [50, 320, 200, 140], [300, 280, 260, 200], [600, 260, 200, 180],
+    [820, 200, 160, 220], [100, 550, 220, 200], [370, 520, 280, 220],
+    [700, 480, 260, 200], [50, 780, 300, 200], [400, 760, 220, 200],
+    [680, 700, 300, 200], [900, 600, 120, 300],
+  ];
+  blocks.forEach(([x, y, w, h]) => {
+    ctx.fillStyle = `rgba(${180+Math.random()*20|0},${155+Math.random()*20|0},${100+Math.random()*20|0},0.25)`;
+    ctx.fillRect(x, y, w, h);
+  });
+
+  // ── Coastal blue strip (east side) ──
+  const seaGrad = ctx.createLinearGradient(870, 0, 1024, 0);
+  seaGrad.addColorStop(0, 'rgba(50,100,170,0)');
+  seaGrad.addColorStop(1, 'rgba(30,80,150,0.85)');
+  ctx.fillStyle = seaGrad;
+  ctx.fillRect(870, 0, 154, 1024);
+
+  // ── Oasis green patch ──
+  ctx.fillStyle = 'rgba(60,120,60,0.35)';
+  ctx.beginPath(); ctx.ellipse(280, 680, 120, 90, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(40,100,40,0.25)';
+  ctx.beginPath(); ctx.ellipse(260, 700, 80, 60, 0.2, 0, Math.PI*2); ctx.fill();
+
+  // ── Industrial zone (north, GCT) ──
+  ctx.fillStyle = 'rgba(90,90,80,0.3)';
+  ctx.fillRect(600, 0, 400, 200);
+
+  // ── Fine noise grain ──
+  for (let i = 0; i < 40000; i++) {
+    const x = Math.random()*1024, y = Math.random()*1024;
+    const v = (Math.random()-0.5)*30;
+    ctx.fillStyle = `rgba(${128+v|0},${105+v|0},${60+v|0},0.08)`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  return tex;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GROUND — The "satellite" base map
+// ═══════════════════════════════════════════════════════════════════════
+const groundTex = createGroundTexture();
+const groundGeo = new THREE.PlaneGeometry(1400, 1400, 80, 80);
+const groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ═══════════════════════════════════════════════════════════════════════
+// SEA — Gulf of Gabès (east side)
+// Gabès sits on the western shore of the Gulf of Gabès
+// ═══════════════════════════════════════════════════════════════════════
+function createWaterTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 512, 512);
+  grad.addColorStop(0, '#0d4a7a'); grad.addColorStop(0.5, '#1a6090');
+  grad.addColorStop(1, '#0a3560');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 512);
+  // wave lines
+  ctx.strokeStyle = 'rgba(100,180,240,0.15)'; ctx.lineWidth = 1.5;
+  for (let y = 0; y < 512; y += 18) {
+    ctx.beginPath(); ctx.moveTo(0, y);
+    for (let x = 0; x < 512; x += 40)
+      ctx.quadraticCurveTo(x+20, y+(Math.random()-0.5)*8, x+40, y);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  return tex;
+}
+let waterOffset = 0;
+const waterTex = createWaterTexture();
+const waterGeo = new THREE.PlaneGeometry(600, 1400);
+const waterMat = new THREE.MeshLambertMaterial({
+  map: waterTex, color: 0x1a6090, transparent: true, opacity: 0.88
+});
+const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+waterMesh.rotation.x = -Math.PI/2;
+waterMesh.position.set(700, -0.3, 0);
+scene.add(waterMesh);
+
+// Shoreline foam strip
+const shoreGeo = new THREE.PlaneGeometry(8, 1400);
+const shoreMat = new THREE.MeshLambertMaterial({ color: 0xd4eaf5, transparent: true, opacity: 0.6 });
+const shore = new THREE.Mesh(shoreGeo, shoreMat);
+shore.rotation.x = -Math.PI/2;
+shore.position.set(398, 0.1, 0);
+scene.add(shore);
+
+// ═══════════════════════════════════════════════════════════════════════
+// BUILDING SYSTEM — Gabès real layout approximation
+// Based on OSM urban structure of Gabès city
+// Origin (0,0) ≈ city centre near Medina
+// X increases eastward (toward sea), Z increases southward
+// ═══════════════════════════════════════════════════════════════════════
+
+const buildingMeshes = [];
+const buildingData = [];
+
+const BUILDING_MATERIALS = {
+  residential: new THREE.MeshLambertMaterial({ color: 0xc4a882 }),
+  residential2: new THREE.MeshLambertMaterial({ color: 0xd4b88a }),
+  residential3: new THREE.MeshLambertMaterial({ color: 0xb89868 }),
+  commercial:   new THREE.MeshLambertMaterial({ color: 0x9a8060 }),
+  medina:       new THREE.MeshLambertMaterial({ color: 0xc8a060 }),
+  industrial:   new THREE.MeshLambertMaterial({ color: 0x888070 }),
+  landmark:     new THREE.MeshLambertMaterial({ color: 0xf0e0a0 }),
+  mosque:       new THREE.MeshLambertMaterial({ color: 0xf5f0dc }),
+};
+
+function randBetween(a, b) { return a + Math.random()*(b-a); }
+function pickMat(type) {
+  const r = ['residential','residential2','residential3'];
+  if (type === 'residential') return BUILDING_MATERIALS[r[Math.floor(Math.random()*3)]];
+  return BUILDING_MATERIALS[type] || BUILDING_MATERIALS.residential;
+}
+
+function addBuilding(x, z, w, d, h, type, name, description) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mat = pickMat(type);
+  const mesh = new THREE.Mesh(geo, mat.clone());
+  mesh.position.set(x, h/2, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  buildingMeshes.push(mesh);
+  buildingData.push({ name: name||type, description: description||'Building in Gabès' });
+
+  // Roof variation
+  if (type !== 'industrial' && Math.random() > 0.4) {
+    const roofH = h * 0.08 + 0.5;
+    const roofGeo = new THREE.BoxGeometry(w*0.92, roofH, d*0.92);
+    const roofCol = new THREE.Color(mat.color).multiplyScalar(0.88);
+    const roofMat = new THREE.MeshLambertMaterial({ color: roofCol });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.set(x, h + roofH/2 - 0.2, z);
+    scene.add(roof);
+  }
+  return mesh;
+}
+
+// Block generator for urban areas
+function addBlock(cx, cz, rows, cols, bW, bD, gap, heightRange, type) {
+  const totalW = cols*(bW+gap) - gap;
+  const totalD = rows*(bD+gap) - gap;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (Math.random() > 0.12) {
+        const bx = cx - totalW/2 + c*(bW+gap) + bW/2;
+        const bz = cz - totalD/2 + r*(bD+gap) + bD/2;
+        const h = randBetween(heightRange[0], heightRange[1]);
+        addBuilding(bx, bz, bW, bD, h, type);
+      }
+    }
+  }
+}
+
+// ─── MEDINA (Old City) — dense low buildings NW of centre ──────────────
+// Tight fabric, 2–4 floors, warm ochre
+addBlock(-120, -80, 8, 10, 10, 10, 3, [6, 14], 'medina');
+addBlock(-180, -120, 6, 8, 8, 8, 2, [5, 12], 'medina');
+addBlock(-90, -140, 5, 7, 9, 9, 3, [6, 10], 'medina');
+
+// ─── CENTRE-VILLE — downtown mixed-use ────────────────────────────────
+addBlock(-30, -30, 5, 7, 14, 12, 5, [10, 28], 'commercial');
+addBlock(30, -60, 4, 6, 12, 10, 5, [8, 22], 'commercial');
+addBlock(-60, 20, 4, 5, 12, 10, 4, [8, 20], 'commercial');
+
+// ─── RESIDENTIAL NORTH (Cité Nouvelle) ────────────────────────────────
+addBlock(-80, -220, 7, 10, 12, 10, 5, [8, 18], 'residential');
+addBlock(60, -200, 6, 8, 11, 10, 5, [8, 16], 'residential');
+addBlock(-160, -280, 6, 9, 10, 9, 4, [6, 14], 'residential');
+
+// ─── RESIDENTIAL SOUTH ────────────────────────────────────────────────
+addBlock(-100, 150, 7, 10, 12, 10, 5, [6, 16], 'residential');
+addBlock(60, 180, 6, 8, 11, 10, 5, [6, 14], 'residential');
+addBlock(-200, 100, 5, 7, 10, 9, 4, [5, 12], 'residential');
+addBlock(-240, 200, 5, 7, 10, 9, 4, [5, 12], 'residential');
+addBlock(120, 120, 5, 6, 11, 10, 4, [6, 14], 'residential');
+
+// ─── INDUSTRIAL ZONE (north, GCT complex area) ────────────────────────
+addBlock(100, -320, 3, 5, 30, 20, 10, [12, 35], 'industrial');
+addBlock(200, -280, 2, 4, 25, 20, 12, [15, 40], 'industrial');
+addBlock(50, -380, 2, 3, 40, 25, 15, [8, 20], 'industrial');
+addBlock(180, -360, 2, 3, 35, 22, 12, [18, 50], 'industrial');
+
+// ─── WATERFRONT buildings ─────────────────────────────────────────────
+addBlock(280, 0, 4, 3, 14, 10, 5, [6, 18], 'commercial');
+addBlock(300, -100, 3, 3, 12, 10, 6, [6, 16], 'residential');
+addBlock(310, 100, 3, 3, 12, 10, 6, [5, 14], 'residential');
+
+// ─── SPORADIC outlying residential ────────────────────────────────────
+for (let i = 0; i < 80; i++) {
+  const x = randBetween(-380, 380);
+  const z = randBetween(-400, 300);
+  if (Math.abs(x) < 50 && Math.abs(z) < 50) continue; // skip centre
+  if (x > 340) continue; // skip sea area
+  const w = randBetween(8, 16), d = randBetween(8, 14), h = randBetween(5, 12);
+  addBuilding(x, z, w, d, h, 'residential');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LANDMARKS — Individually crafted, recognizable structures
+// ═══════════════════════════════════════════════════════════════════════
+
+const landmarks = [];
+
+// ── 1. GRANDE MOSQUÉE DE GABÈS (city centre) ──────────────────────────
+// White body, minaret, dome
+function buildMosque(cx, cz) {
+  const group = new THREE.Group();
+
+  // Main prayer hall (rectangular)
+  const hallGeo = new THREE.BoxGeometry(28, 9, 22);
+  const hallMat = new THREE.MeshLambertMaterial({ color: 0xf5f0dc });
+  const hall = new THREE.Mesh(hallGeo, hallMat);
+  hall.position.set(0, 4.5, 0);
+  hall.castShadow = true; group.add(hall);
+
+  // Arcade arches (simplified as smaller boxes)
+  for (let i = -2; i <= 2; i++) {
+    const archGeo = new THREE.BoxGeometry(4, 7, 4);
+    const archMat = new THREE.MeshLambertMaterial({ color: 0xefe8cc });
+    const arch = new THREE.Mesh(archGeo, archMat);
+    arch.position.set(i*5, 3.5, 13);
+    arch.castShadow = true; group.add(arch);
+  }
+
+  // Central dome
+  const domeSphereGeo = new THREE.SphereGeometry(5.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2);
+  const domeMat = new THREE.MeshLambertMaterial({ color: 0xe8ddb8 });
+  const dome = new THREE.Mesh(domeSphereGeo, domeMat);
+  dome.position.set(0, 9, 0);
+  group.add(dome);
+
+  // Minaret (tall square tower)
+  const minaretGeo = new THREE.BoxGeometry(4, 28, 4);
+  const minaretMat = new THREE.MeshLambertMaterial({ color: 0xf5f0dc });
+  const minaret = new THREE.Mesh(minaretGeo, minaretMat);
+  minaret.position.set(-16, 14, -8);
+  minaret.castShadow = true; group.add(minaret);
+
+  // Minaret cap
+  const capGeo = new THREE.CylinderGeometry(0.2, 2.5, 5, 8);
+  const capMat = new THREE.MeshLambertMaterial({ color: 0x6a8a30 });
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.set(-16, 30, -8); group.add(cap);
+
+  // Courtyard wall
+  const wallGeo = new THREE.BoxGeometry(38, 2.5, 2);
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0xe0d5b0 });
+  const wall1 = new THREE.Mesh(wallGeo, wallMat);
+  wall1.position.set(0, 1.25, -16); group.add(wall1);
+  const wall2 = wall1.clone(); wall2.position.set(0, 1.25, 18); group.add(wall2);
+
+  group.position.set(cx, 0, cz);
+  scene.add(group);
+  landmarks.push({ group, pos: new THREE.Vector3(cx, 15, cz), name: 'Grande Mosquée de Gabès' });
+  return group;
+}
+buildMosque(-20, -10);
+
+// ── 2. PORT DE GABÈS (northeast, near shore) ──────────────────────────
+function buildPort(cx, cz) {
+  const group = new THREE.Group();
+
+  // Pier / jetty
+  const pierGeo = new THREE.BoxGeometry(120, 1.5, 18);
+  const pierMat = new THREE.MeshLambertMaterial({ color: 0x888878 });
+  const pier = new THREE.Mesh(pierGeo, pierMat);
+  pier.position.set(60, 0.75, 0); group.add(pier);
+
+  // Dock buildings (warehouses)
+  for (let i = 0; i < 4; i++) {
+    const wGeo = new THREE.BoxGeometry(20, 10, 14);
+    const wMat = new THREE.MeshLambertMaterial({ color: 0x7a8075 });
+    const w = new THREE.Mesh(wGeo, wMat);
+    w.position.set(i*24 + 12, 5, -14); w.castShadow = true; group.add(w);
+  }
+
+  // Lighthouse
+  const ltGeo = new THREE.CylinderGeometry(2, 3.5, 22, 8);
+  const ltMat = new THREE.MeshLambertMaterial({ color: 0xf0f0f0 });
+  const lt = new THREE.Mesh(ltGeo, ltMat);
+  lt.position.set(0, 11, 0); group.add(lt);
+  const ltTopGeo = new THREE.CylinderGeometry(2, 2, 4, 8);
+  const ltTopMat = new THREE.MeshLambertMaterial({ color: 0xe00000 });
+  const ltTop = new THREE.Mesh(ltTopGeo, ltTopMat);
+  ltTop.position.set(0, 24, 0); group.add(ltTop);
+
+  // Boats (simple hulls)
+  for (let b = 0; b < 5; b++) {
+    const boatGeo = new THREE.BoxGeometry(16, 3, 5);
+    const boatMat = new THREE.MeshLambertMaterial({ color: [0xffffff, 0x4488cc, 0xcc4422, 0x88aaff, 0xffcc44][b] });
+    const boat = new THREE.Mesh(boatGeo, boatMat);
+    boat.position.set(b*20 + 20, 1.2, 14); group.add(boat);
+    const mastGeo = new THREE.CylinderGeometry(0.3, 0.3, 10, 4);
+    const mastMat = new THREE.MeshLambertMaterial({ color: 0xccbbaa });
+    const mast = new THREE.Mesh(mastGeo, mastMat);
+    mast.position.set(b*20 + 20, 7, 14); group.add(mast);
+  }
+
+  // Breakwater
+  const bwGeo = new THREE.BoxGeometry(160, 3, 8);
+  const bwMat = new THREE.MeshLambertMaterial({ color: 0x808070 });
+  const bw = new THREE.Mesh(bwGeo, bwMat);
+  bw.position.set(80, 0, 20); group.add(bw);
+
+  group.position.set(cx, 0, cz);
+  scene.add(group);
+  landmarks.push({ group, pos: new THREE.Vector3(cx+60, 12, cz), name: 'Port de Gabès' });
+}
+buildPort(260, -180);
+
+// ── 3. OASIS DE CHENINI (southwest — famous urban oasis) ──────────────
+function buildOasis(cx, cz) {
+  const group = new THREE.Group();
+
+  // Ground cover (green)
+  const oasisGeo = new THREE.CylinderGeometry(90, 95, 0.5, 32);
+  const oasisMat = new THREE.MeshLambertMaterial({ color: 0x4a8040 });
+  const oasisBase = new THREE.Mesh(oasisGeo, oasisMat);
+  oasisBase.position.set(0, 0.25, 0); group.add(oasisBase);
+
+  // Palm trees (many — Gabès is famous for them)
+  function palm(px, pz, h) {
+    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.8, h, 6);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8a6030 });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(px, h/2, pz);
+    trunk.rotation.z = (Math.random()-0.5)*0.2;
+    trunk.rotation.x = (Math.random()-0.5)*0.15;
+    group.add(trunk);
+    // Crown (sphere approximation)
+    const crownGeo = new THREE.SphereGeometry(2.2+Math.random(), 6, 5);
+    const crownMat = new THREE.MeshLambertMaterial({ color: 0x2d7a28 });
+    const crown = new THREE.Mesh(crownGeo, crownMat);
+    crown.position.set(px, h + 1.5, pz);
+    crown.scale.y = 0.6;
+    group.add(crown);
+  }
+
+  // Dense palm placement
+  for (let i = 0; i < 120; i++) {
+    const angle = Math.random()*Math.PI*2;
+    const r = Math.random()*80;
+    palm(Math.cos(angle)*r, Math.sin(angle)*r, 5 + Math.random()*8);
+  }
+
+  // Wadi (stream channel) — Oued Gabès runs through
+  const wadiGeo = new THREE.PlaneGeometry(180, 8);
+  const wadiMat = new THREE.MeshLambertMaterial({ color: 0x3090a0, transparent: true, opacity: 0.7 });
+  const wadi = new THREE.Mesh(wadiGeo, wadiMat);
+  wadi.rotation.x = -Math.PI/2; wadi.rotation.z = 0.5;
+  wadi.position.set(0, 0.8, 0); group.add(wadi);
+
+  group.position.set(cx, 0, cz);
+  scene.add(group);
+  landmarks.push({ group, pos: new THREE.Vector3(cx, 12, cz), name: 'Oasis de Chenini' });
+}
+buildOasis(-200, 120);
+
+// ── 4. GCT INDUSTRIAL COMPLEX (north) — Groupe Chimique Tunisien ───────
+function buildGCT(cx, cz) {
+  const group = new THREE.Group();
+
+  // Main factory buildings
+  const factoryColors = [0x888070, 0x7a7870, 0x8a8878, 0x707060];
+  const layout = [
+    [-60, 0, 50, 30, 20], [0, 10, 60, 25, 25], [70, -10, 45, 35, 18],
+    [-40, -50, 30, 20, 15], [40, -40, 35, 22, 12],
+  ];
+  layout.forEach(([lx, lz, w, d, h], i) => {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mat = new THREE.MeshLambertMaterial({ color: factoryColors[i%factoryColors.length] });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(lx, h/2, lz); mesh.castShadow = true; group.add(mesh);
+  });
+
+  // Chimneys (iconic industrial silhouette)
+  for (let i = 0; i < 4; i++) {
+    const chGeo = new THREE.CylinderGeometry(1.5, 2.5, 40 + i*8, 8);
+    const chMat = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
+    const ch = new THREE.Mesh(chGeo, chMat);
+    ch.position.set(-40 + i*28, 25 + i*4, -20); group.add(ch);
+
+    // Red band on chimney
+    const bandGeo = new THREE.CylinderGeometry(2.6, 2.6, 2, 8);
+    const bandMat = new THREE.MeshLambertMaterial({ color: 0xcc2222 });
+    const band = new THREE.Mesh(bandGeo, bandMat);
+    band.position.set(-40 + i*28, 42 + i*4, -20); group.add(band);
+  }
+
+  // Storage tanks
+  for (let i = 0; i < 3; i++) {
+    const tankGeo = new THREE.CylinderGeometry(10, 10, 12, 16);
+    const tankMat = new THREE.MeshLambertMaterial({ color: 0xc0b8a8 });
+    const tank = new THREE.Mesh(tankGeo, tankMat);
+    tank.position.set(90 + i*25, 6, 30); group.add(tank);
+  }
+
+  // Perimeter fence
+  const fenceGeo = new THREE.BoxGeometry(240, 2, 2);
+  const fenceMat = new THREE.MeshLambertMaterial({ color: 0x666660 });
+  const f1 = new THREE.Mesh(fenceGeo, fenceMat); f1.position.set(0, 1, 80); group.add(f1);
+  const f2 = new THREE.Mesh(fenceGeo, fenceMat); f2.position.set(0, 1, -80); group.add(f2);
+
+  group.position.set(cx, 0, cz);
+  scene.add(group);
+  landmarks.push({ group, pos: new THREE.Vector3(cx, 30, cz), name: 'Complexe GCT' });
+}
+buildGCT(100, -340);
+
+// ── 5. AVENUE HABIB BOURGUIBA (main boulevard) ────────────────────────
+function buildBourguibdAve(cx, cz) {
+  // Road surface
+  const roadGeo = new THREE.PlaneGeometry(420, 18);
+  const roadMat = new THREE.MeshLambertMaterial({ color: 0x4a4840 });
+  const road = new THREE.Mesh(roadGeo, roadMat);
+  road.rotation.x = -Math.PI/2; road.position.set(cx, 0.2, cz);
+  scene.add(road);
+
+  // Centre line
+  const lineGeo = new THREE.PlaneGeometry(420, 1);
+  const lineMat = new THREE.MeshLambertMaterial({ color: 0xf0d080, transparent: true, opacity: 0.7 });
+  const line = new THREE.Mesh(lineGeo, lineMat);
+  line.rotation.x = -Math.PI/2; line.position.set(cx, 0.25, cz);
+  scene.add(line);
+
+  // Trees along avenue
+  function streetTree(px, pz) {
+    const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 6, 6);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(px, 3, pz); scene.add(trunk);
+    const crownGeo = new THREE.SphereGeometry(3.5, 6, 5);
+    const crownMat = new THREE.MeshLambertMaterial({ color: 0x3d7a28 });
+    const crown = new THREE.Mesh(crownGeo, crownMat);
+    crown.position.set(px, 8.5, pz); scene.add(crown);
+  }
+
+  for (let i = -9; i <= 9; i++) {
+    streetTree(cx + i*22, cz - 12);
+    streetTree(cx + i*22, cz + 12);
+  }
+
+  // Street lighting (simple poles)
+  for (let i = -8; i <= 8; i++) {
+    const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 8, 4);
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(cx + i*28, 4, cz + 10); scene.add(pole);
+    const lampGeo = new THREE.SphereGeometry(0.8, 6, 4);
+    const lampMat = new THREE.MeshLambertMaterial({ color: 0xffe8a0, emissive: 0xffe880, emissiveIntensity: 0.5 });
+    const lamp = new THREE.Mesh(lampGeo, lampMat);
+    lamp.position.set(cx + i*28, 8.5, cz + 10); scene.add(lamp);
+  }
+
+  landmarks.push({ group: null, pos: new THREE.Vector3(cx, 10, cz), name: 'Avenue Habib Bourguiba' });
+}
+buildBourguibdAve(0, 20);
+
+// ── 6. MÉDINA DE GABÈS — old town market core ────────────────────────
+function buildMedina(cx, cz) {
+  const group = new THREE.Group();
+
+  // City gate (Bab)
+  const gateGeo = new THREE.BoxGeometry(14, 12, 6);
+  const gateMat = new THREE.MeshLambertMaterial({ color: 0xc8a050 });
+  const gate = new THREE.Mesh(gateGeo, gateMat);
+  gate.position.set(0, 6, 0); group.add(gate);
+
+  // Arch opening
+  const archGeo = new THREE.CylinderGeometry(3.5, 3.5, 6, 8, 1, true, 0, Math.PI);
+  const archMat = new THREE.MeshLambertMaterial({ color: 0x0a1628, side: THREE.BackSide });
+  const arch = new THREE.Mesh(archGeo, archMat);
+  arch.rotation.z = Math.PI/2; arch.rotation.y = Math.PI/2;
+  arch.position.set(0, 4, 0); group.add(arch);
+
+  // Towers at gate
+  for (const sx of [-9, 9]) {
+    const tGeo = new THREE.BoxGeometry(5, 15, 5);
+    const tMat = new THREE.MeshLambertMaterial({ color: 0xd0a860 });
+    const t = new THREE.Mesh(tGeo, tMat);
+    t.position.set(sx, 7.5, 0); group.add(t);
+    const topGeo = new THREE.ConeGeometry(3, 4, 8);
+    const topMat = new THREE.MeshLambertMaterial({ color: 0x5a8a30 });
+    const top = new THREE.Mesh(topGeo, topMat);
+    top.position.set(sx, 17, 0); group.add(top);
+  }
+
+  // Souk alleys (narrow passageways)
+  const soukColors = [0xc09050, 0xb88040, 0xc8a860, 0xb09040];
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 6; col++) {
+      const h = 5 + Math.random()*5;
+      const sGeo = new THREE.BoxGeometry(9, h, 8);
+      const sMat = new THREE.MeshLambertMaterial({ color: soukColors[(row+col)%4] });
+      const s = new THREE.Mesh(sGeo, sMat);
+      s.position.set(col*11 - 25, h/2, row*10 + 10);
+      s.castShadow = true; group.add(s);
+    }
+  }
+
+  group.position.set(cx, 0, cz);
+  scene.add(group);
+  landmarks.push({ group, pos: new THREE.Vector3(cx, 15, cz), name: 'Médina de Gabès' });
+}
+buildMedina(-140, -50);
+
+// ═══════════════════════════════════════════════════════════════════════
+// PALM TREES — scattered across city (Gabès = "garden of the Sahara")
+// ═══════════════════════════════════════════════════════════════════════
+function addPalm(x, z, h) {
+  const trunkGeo = new THREE.CylinderGeometry(0.4, 0.7, h, 6);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x7a5228 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.set(x, h/2, z);
+  trunk.rotation.z = (Math.random()-0.5)*0.15;
+  trunk.castShadow = true; scene.add(trunk);
+
+  const crownGeo = new THREE.SphereGeometry(2 + Math.random()*0.8, 6, 5);
+  const crownMat = new THREE.MeshLambertMaterial({ color: 0x2a7020 });
+  const crown = new THREE.Mesh(crownGeo, crownMat);
+  crown.scale.set(1.2, 0.6, 1.2);
+  crown.position.set(x, h + 1.2, z);
+  scene.add(crown);
+}
+
+// Scatter palms throughout city
+const palmLocations = [
+  [20, -100], [-40, 80], [100, 60], [-100, 40], [150, -50],
+  [200, 80], [-160, -100], [50, 200], [-250, 60], [280, 100],
+  [-300, -80], [320, -60], [-200, 250], [60, -160], [-80, -200],
+  [130, 180], [-120, 180], [230, 140], [-260, 140], [90, -240],
+  [10, -300], [-50, 280], [170, -130], [-190, -200], [240, 220],
+];
+palmLocations.forEach(([x, z]) => addPalm(x, z, 6 + Math.random()*7));
+
+// ═══════════════════════════════════════════════════════════════════════
+// ROAD NETWORK — major streets with slight elevation
+// ═══════════════════════════════════════════════════════════════════════
+function addRoad(x1, z1, x2, z2, width) {
+  const dx = x2-x1, dz = z2-z1;
+  const len = Math.sqrt(dx*dx + dz*dz);
+  const angle = Math.atan2(dz, dx);
+  const geo = new THREE.PlaneGeometry(len, width);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x4a4840, transparent: true, opacity: 0.9 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI/2;
+  mesh.rotation.z = -angle;
+  mesh.position.set((x1+x2)/2, 0.15, (z1+z2)/2);
+  scene.add(mesh);
+}
+
+// Main roads of Gabès
+addRoad(-400, 20, 350, 20, 14);      // Ave Bourguiba (E-W)
+addRoad(0, -420, 0, 300, 12);        // Route de Tunis (N-S)
+addRoad(-400, -80, 300, -80, 10);    // Route de Sfax
+addRoad(-200, -420, -200, 300, 8);   // Western bypass
+addRoad(0, -420, 260, -250, 10);     // Route to port
+addRoad(-400, 100, 400, 80, 8);      // Southern avenue
+addRoad(-100, -80, 300, 100, 8);     // Diagonal coastal road
+addRoad(100, -420, 100, 300, 7);     // Internal route
+
+// ═══════════════════════════════════════════════════════════════════════
+// ORBIT CONTROLS (manual — no import needed)
+// ═══════════════════════════════════════════════════════════════════════
+let isMouseDown = false;
+let mouseX = 0, mouseY = 0;
+let theta = 0.8, phi = 1.0, radius = 580;
+let targetTheta = 0.8, targetPhi = 1.0, targetRadius = 580;
+let panX = 0, panZ = 0, targetPanX = 0, targetPanZ = 0;
+
+const domEl = renderer.domElement;
+
+domEl.addEventListener('mousedown', e => {
+  isMouseDown = true;
+  mouseX = e.clientX; mouseY = e.clientY;
+});
+domEl.addEventListener('mouseup', () => isMouseDown = false);
+domEl.addEventListener('mousemove', e => {
+  if (!isMouseDown) return;
+  const dx = e.clientX - mouseX, dy = e.clientY - mouseY;
+  mouseX = e.clientX; mouseY = e.clientY;
+  if (e.shiftKey) {
+    targetPanX -= dx * 0.4;
+    targetPanZ -= dy * 0.4;
+  } else {
+    targetTheta -= dx * 0.006;
+    targetPhi = Math.max(0.18, Math.min(1.55, targetPhi - dy * 0.005));
+  }
+});
+domEl.addEventListener('wheel', e => {
+  targetRadius = Math.max(50, Math.min(1200, targetRadius + e.deltaY * 0.5));
+  e.preventDefault();
+}, { passive: false });
+
+// Touch
+let touch0 = null, touch1 = null, lastPinchDist = 0;
+domEl.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { touch0 = e.touches[0]; }
+  if (e.touches.length === 2) {
+    touch0 = e.touches[0]; touch1 = e.touches[1];
+    lastPinchDist = Math.hypot(touch0.clientX-touch1.clientX, touch0.clientY-touch1.clientY);
+  }
+});
+domEl.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && touch0) {
+    const dx = e.touches[0].clientX - touch0.clientX;
+    const dy = e.touches[0].clientY - touch0.clientY;
+    targetTheta -= dx * 0.008; targetPhi = Math.max(0.18, Math.min(1.55, targetPhi - dy*0.006));
+    touch0 = e.touches[0];
+  }
+  if (e.touches.length === 2) {
+    const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    targetRadius = Math.max(50, Math.min(1200, targetRadius - (dist - lastPinchDist) * 1.5));
+    lastPinchDist = dist;
+  }
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════════════════
+// RAYCASTING — click / hover on buildings
+// ═══════════════════════════════════════════════════════════════════════
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('info-tooltip');
+let hoveredMesh = null;
+const originalColors = new Map();
+
+domEl.addEventListener('mousemove', e => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(buildingMeshes);
+  if (hits.length > 0) {
+    const mesh = hits[0].object;
+    if (mesh !== hoveredMesh) {
+      if (hoveredMesh && originalColors.has(hoveredMesh)) {
+        hoveredMesh.material.color.setHex(originalColors.get(hoveredMesh));
+      }
+      hoveredMesh = mesh;
+      const orig = mesh.material.color.getHex();
+      if (!originalColors.has(mesh)) originalColors.set(mesh, orig);
+      mesh.material.color.setHex(0xffeeaa);
+      const idx = buildingMeshes.indexOf(mesh);
+      if (idx >= 0) {
+        const d = buildingData[idx];
+        document.getElementById('tooltip-title').textContent = d.name;
+        document.getElementById('tooltip-desc').textContent = d.description;
+      }
+    }
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY - 40) + 'px';
+    domEl.style.cursor = 'pointer';
+  } else {
+    if (hoveredMesh && originalColors.has(hoveredMesh)) {
+      hoveredMesh.material.color.setHex(originalColors.get(hoveredMesh));
+      hoveredMesh = null;
+    }
+    tooltip.style.display = 'none';
+    domEl.style.cursor = 'default';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FOCUS LANDMARK — animate camera to landmark
+// ═══════════════════════════════════════════════════════════════════════
+const GABES_GOVERNORATE_PATH = 'M172 95 L228 76 L292 89 L337 69 L392 50 L454 55 L479 90 L515 90 L541 69 L578 79 L609 108 L629 105 L648 130 L656 157 L663 187 L676 222 L695 267 L719 309 L755 352 L800 386 L790 416 L756 428 L712 442 L666 468 L620 498 L567 511 L511 522 L455 543 L398 547 L353 531 L327 497 L314 462 L296 434 L249 423 L198 417 L180 383 L167 333 L157 289 L157 244 L163 199 L169 151 Z';
+
+const GABES_MAP_CATEGORIES = {
+  urban: { label: 'Urban Core', color: '#f0d080' },
+  coast: { label: 'Coastal', color: '#4fc3f7' },
+  oasis: { label: 'Oasis', color: '#81c784' },
+  inland: { label: 'Inland', color: '#ffb74d' },
+  mountain: { label: 'Mountain', color: '#ce93d8' },
+};
+
+const gabesMapLocations = [
+  { name: 'Ghannouch', note: 'Northern coastal delegation on the Gulf of Gabes.', category: 'coast', x: 670, y: 92, dx: 16, dy: -18 },
+  { name: 'Gabes Medina', note: 'Historic urban core and governorate capital.', category: 'urban', x: 639, y: 140, dx: 14, dy: -28 },
+  { name: 'Gabes Ouest', note: 'Western urban district of Greater Gabes.', category: 'urban', x: 595, y: 165, dx: -118, dy: -18 },
+  { name: 'Chenini', note: 'Historic oasis village in the Gabes oasis landscape.', category: 'oasis', x: 566, y: 186, dx: -104, dy: -2 },
+  { name: 'Menzel', note: 'Traditional oasis quarter between the urban core and the sea.', category: 'oasis', x: 616, y: 174, dx: 14, dy: -10 },
+  { name: 'Jara', note: 'Traditional quarter known for the oasis and souk fabric.', category: 'oasis', x: 648, y: 171, dx: 14, dy: 0 },
+  { name: 'Petite Jara', note: 'Smaller oasis quarter adjacent to Jara.', category: 'oasis', x: 662, y: 191, dx: 14, dy: 18 },
+  { name: 'Gabes Sud', note: 'Southern urban delegation along the coastal corridor.', category: 'urban', x: 630, y: 208, dx: 14, dy: 18 },
+  { name: 'Nouvelle Matmata', note: 'Plateau settlement west of Greater Gabes.', category: 'mountain', x: 253, y: 315, dx: -138, dy: -10 },
+  { name: 'Matmata', note: 'Mountain delegation known for troglodyte settlements.', category: 'mountain', x: 208, y: 344, dx: -88, dy: 10 },
+  { name: 'El Hamma', note: 'Western oasis delegation anchored by springs and palm groves.', category: 'oasis', x: 473, y: 383, dx: -118, dy: 10 },
+  { name: 'Menzel El Habib', note: 'Southwestern interior delegation.', category: 'inland', x: 313, y: 432, dx: -152, dy: 0 },
+  { name: 'Oudhref', note: 'Interior delegation east of El Hamma.', category: 'inland', x: 610, y: 430, dx: 18, dy: 18 },
+  { name: 'El Metouia', note: 'Southeastern coastal delegation.', category: 'coast', x: 732, y: 360, dx: 16, dy: 8 },
+  { name: 'Mareth', note: 'Southern coastal delegation toward the Mareth plain.', category: 'coast', x: 707, y: 455, dx: 18, dy: 18 },
+  { name: 'Dkhilet Toujane', note: 'Mountain gateway near Toujane on the southeast edge.', category: 'mountain', x: 789, y: 430, dx: -126, dy: 12 },
+  { name: 'Habib Thameur', note: 'Southern desert-edge delegation created in the newer administrative split.', category: 'inland', x: 395, y: 506, dx: -126, dy: 18 },
+];
+
+const GABES_INSIGHT_STYLES = {
+  red: { label: 'High Risk', color: '#ff5f5f', kicker: 'Health / environmental hotspot' },
+  yellow: { label: 'Medium Risk', color: '#f4c84a', kicker: 'Watch zone' },
+  green: { label: 'Lower Documented Risk', color: '#56c271', kicker: 'Lower documented risk' },
+  investor: { label: 'Investor Opportunity', color: '#57b8ff', kicker: 'Investor signal' },
+};
+
+const gabesInsightPins = [
+  {
+    id: 'industrial-coast',
+    type: 'risk',
+    level: 'red',
+    x: 652,
+    y: 240,
+    title: 'Central industrial coast / inter-harbor',
+    summary: 'Highest documented hotspot on the map. Peer-reviewed coastal studies found the central Gabes shore near the chemical complex to be the most degraded, and the inter-harbor zone south of the complex to carry the highest ecological risk. A separate study also assessed radiation hazards from phosphate-treatment wastes to people and the surrounding environment.',
+    sources: [
+      { label: 'PubMed 2018 seawater study', url: 'https://pubmed.ncbi.nlm.nih.gov/29475683/' },
+      { label: 'Marine Pollution Bulletin 2015 sediment study', url: 'https://www.sciencedirect.com/science/article/pii/S0025326X15301211' },
+      { label: 'PubMed 2019 radiation-hazard study', url: 'https://pubmed.ncbi.nlm.nih.gov/31426180/' },
+    ],
+  },
+  {
+    id: 'south-gabes-groundwater',
+    type: 'risk',
+    level: 'red',
+    x: 704,
+    y: 448,
+    title: 'South Gabes / Mareth-Arram groundwater belt',
+    summary: 'Red because groundwater studies in southern Gabes reported high dissolved solids, nitrate contamination, marine intrusion around El Hajel Wadi, and water described as poor to bad quality. An older groundwater study also reported fluoride above the WHO guideline in parts of the Gabes-south aquifer.',
+    sources: [
+      { label: 'Journal of African Earth Sciences 2023', url: 'https://www.sciencedirect.com/science/article/pii/S1464343X23000481' },
+      { label: 'Physics and Chemistry of the Earth study', url: 'https://www.sciencedirect.com/science/article/pii/S1474706510000148' },
+    ],
+  },
+  {
+    id: 'chenini-oasis',
+    type: 'risk',
+    level: 'yellow',
+    x: 568,
+    y: 190,
+    title: 'Chenini oasis edge',
+    summary: 'Yellow because the available evidence points to stress and degradation rather than the most extreme hotspot level. A peer-reviewed oasis study found reduced breeding performance near the Gabes-Ghannouche factory complex, which signals pollution pressure on nearby oasis habitat.',
+    sources: [
+      { label: 'PubMed 2012 oasis study', url: 'https://pubmed.ncbi.nlm.nih.gov/22266034/' },
+      { label: 'ScienceDirect abstract', url: 'https://www.sciencedirect.com/science/article/abs/pii/S0147651311004751' },
+    ],
+  },
+  {
+    id: 'north-shore',
+    type: 'risk',
+    level: 'green',
+    x: 710,
+    y: 86,
+    title: 'North shore toward Ghannouch',
+    summary: 'Green here means lower documented risk relative to the central and southern industrial coast, not risk-free. The same coastal studies that flagged the central hotspot reported the worst degradation in the central area and noted that port structures seem to protect the northern area from contamination.',
+    sources: [
+      { label: 'PubMed 2018 seawater study', url: 'https://pubmed.ncbi.nlm.nih.gov/29475683/' },
+      { label: 'Marine Pollution Bulletin 2015 sediment study', url: 'https://www.sciencedirect.com/science/article/pii/S0025326X15301211' },
+    ],
+  },
+  {
+    id: 'port-of-gabes',
+    type: 'investor',
+    level: 'investor',
+    x: 702,
+    y: 150,
+    title: 'Port of Gabes',
+    summary: 'Official port data describes Gabes as a commercial port serving Tunisian industry, especially bulk chemical traffic tied to nearby factories. That makes it a logistics and industrial gateway, but investors should pair that upside with strict environmental due diligence because adjacent coastal studies flag nearby risk.',
+    sources: [
+      { label: 'OMMP Port of Gabes', url: 'https://www.ommp.nat.tn/ports/gabes-en/?lang=en' },
+      { label: 'PubMed 2018 seawater study', url: 'https://pubmed.ncbi.nlm.nih.gov/29475683/' },
+    ],
+  },
+  {
+    id: 'gabes-industrial-zone',
+    type: 'investor',
+    level: 'investor',
+    x: 620,
+    y: 150,
+    title: 'Gabes Industrial Zone',
+    summary: 'FIPA says Gabes has an existing industrial zone spread over 828 hectares and explicitly presents it as an opportunity for production, logistics and research. This is one of the clearest official investment signals on the map.',
+    sources: [
+      { label: 'FIPA / Invest in Tunisia - Gabes', url: 'https://investintunisia.tn/en/gabes/' },
+    ],
+  },
+  {
+    id: 'menzel-lahhib-zone',
+    type: 'investor',
+    level: 'investor',
+    x: 315,
+    y: 430,
+    title: 'Manzel Lahhib Industrial Zone',
+    summary: 'FIPA lists Manzel Lahhib as an existing industrial zone. It stands out as an inland investment area that is officially recognized for industrial development and is away from the best-documented marine hotspot on the central coast.',
+    sources: [
+      { label: 'FIPA / Invest in Tunisia - Gabes', url: 'https://investintunisia.tn/en/gabes/' },
+    ],
+  },
+  {
+    id: 'oasis-value-chain',
+    type: 'investor',
+    level: 'investor',
+    x: 624,
+    y: 188,
+    title: 'Gabes oasis value chain',
+    summary: 'This pin highlights agri-processing, heritage and eco-tourism potential. Official and heritage sources describe Gabes as having 300,000 date palms, strong agricultural output, craft traditions and tourism assets, which supports investor interest in local product processing and cultural tourism.',
+    sources: [
+      { label: 'FIPA / Invest in Tunisia - Gabes', url: 'https://investintunisia.tn/en/gabes/' },
+      { label: 'UNESCO Tentative List - Oasis de Gabes', url: 'https://whc.unesco.org/en/tentativelists/5386/' },
+    ],
+  },
+  {
+    id: 'nouvelle-matmata-zone',
+    type: 'investor',
+    level: 'investor',
+    x: 260,
+    y: 316,
+    title: 'Nouvelle Matmata planned zone',
+    summary: 'FIPA identifies a new Matmata industrial zone as planned. That makes this area a forward-looking inland opportunity rather than an already mature logistics node.',
+    sources: [
+      { label: 'FIPA / Invest in Tunisia - Gabes', url: 'https://investintunisia.tn/en/gabes/' },
+    ],
+  },
+];
+
+function renderGabesMap() {
+  const mapGraphic = document.getElementById('map-graphic');
+  const cityMap = document.getElementById('city-map');
+  const mapLegend = document.getElementById('map-legend');
+  const mapHeaderTitle = document.querySelector('#map-header h3');
+  const mapHeaderDesc = document.querySelector('#map-header p');
+  const mapClose = document.getElementById('map-close');
+  const coords = document.getElementById('coords');
+
+  if (!mapGraphic || !cityMap || !mapLegend || cityMap.dataset.ready === 'true') return;
+
+  mapHeaderTitle.textContent = 'Gabes Governorate Map';
+  mapHeaderDesc.textContent = 'Boundary profile and locations refreshed from public Gabes delegation and oasis references';
+  mapClose.textContent = 'X';
+
+  let leftColumn = mapGraphic.querySelector('.map-left-column');
+  if (!leftColumn) {
+    leftColumn = document.createElement('div');
+    leftColumn.className = 'map-left-column';
+    mapGraphic.insertBefore(leftColumn, cityMap);
+    leftColumn.appendChild(cityMap);
+    leftColumn.appendChild(mapLegend);
+  }
+
+  let registry = document.getElementById('map-registry');
+  if (!registry) {
+    registry = document.createElement('div');
+    registry.id = 'map-registry';
+    mapGraphic.appendChild(registry);
+  }
+
+  if (!coords.querySelector('.map-open')) {
+    const mapOpen = document.createElement('div');
+    mapOpen.className = 'map-open';
+    mapOpen.textContent = 'Open Gabes Map';
+    mapOpen.onclick = () => window.toggleMap(true);
+    coords.appendChild(mapOpen);
+  }
+
+  function buildInsightSymbol(pin) {
+    const style = GABES_INSIGHT_STYLES[pin.level];
+    if (pin.type === 'investor') {
+      return `
+        <polygon points="${pin.x},${pin.y - 8} ${pin.x + 8},${pin.y} ${pin.x},${pin.y + 8} ${pin.x - 8},${pin.y}"
+          fill="${style.color}" class="map-insight-symbol" />
+      `;
+    }
+    return `<circle cx="${pin.x}" cy="${pin.y}" r="6.5" fill="${style.color}" class="map-insight-symbol" />`;
+  }
+
+  const markerMarkup = gabesMapLocations.map(location => {
+    const category = GABES_MAP_CATEGORIES[location.category];
+    const labelX = location.x + location.dx;
+    const labelY = location.y + location.dy;
+    return `
+      <g class="map-marker">
+        <line x1="${location.x}" y1="${location.y}" x2="${labelX}" y2="${labelY}" class="map-anchor" />
+        <circle cx="${location.x}" cy="${location.y}" r="5.5" fill="${category.color}" stroke="#ffffff" stroke-width="1.5" />
+        <circle cx="${location.x}" cy="${location.y}" r="12" fill="${category.color}" opacity="0.16" />
+        <text x="${labelX}" y="${labelY}" class="map-label">${location.name}</text>
+        <text x="${labelX}" y="${labelY + 13}" class="map-label-secondary">${category.label}</text>
+      </g>
+    `;
+  }).join('');
+
+  const insightMarkup = gabesInsightPins.map(pin => {
+    const style = GABES_INSIGHT_STYLES[pin.level];
+    return `
+      <g class="map-insight-pin" data-pin-id="${pin.id}" tabindex="0" role="button" aria-label="${pin.title}">
+        <circle cx="${pin.x}" cy="${pin.y}" r="15" fill="${style.color}" class="map-insight-ring" />
+        ${buildInsightSymbol(pin)}
+      </g>
+    `;
+  }).join('');
+
+  cityMap.innerHTML = `
+    <svg viewBox="0 0 860 560" xmlns="http://www.w3.org/2000/svg" aria-label="Gabes governorate map">
+      <defs>
+        <linearGradient id="gabesSea" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#24537b" />
+          <stop offset="100%" stop-color="#0c2340" />
+        </linearGradient>
+        <radialGradient id="gabesLand" cx="0.35" cy="0.4" r="0.9">
+          <stop offset="0%" stop-color="#f5e0a9" />
+          <stop offset="100%" stop-color="#bb945f" />
+        </radialGradient>
+      </defs>
+      <rect width="860" height="560" fill="#07111f" rx="16" />
+      <path d="M608 0 C720 24 836 178 860 356 L860 560 L860 0 Z" fill="url(#gabesSea)" opacity="0.94" />
+      <path class="map-coast-glow" d="M649 118 C667 180 683 240 704 287 C731 344 767 375 795 393" />
+      <path d="${GABES_GOVERNORATE_PATH}" fill="url(#gabesLand)" class="map-outline" />
+      <path class="map-relief" d="M214 118 C328 105 431 136 532 207" />
+      <path class="map-relief" d="M206 248 C322 232 435 260 559 339" />
+      <path class="map-relief" d="M271 435 C387 419 504 430 632 486" />
+      <path class="map-relief" d="M476 93 C560 129 615 190 662 304" />
+      <text x="694" y="80" class="map-coast-label">Gulf of Gabes</text>
+      ${markerMarkup}
+      ${insightMarkup}
+    </svg>
+    <div id="map-pin-tooltip" aria-live="polite"></div>
+  `;
+
+  const categoryLegend = Object.values(GABES_MAP_CATEGORIES).map(category => `
+    <div class="legend-pill"><span class="legend-dot" style="background:${category.color}"></span>${category.label}</div>
+  `).join('');
+  const insightLegend = Object.entries(GABES_INSIGHT_STYLES).map(([, style]) => `
+    <div class="legend-pill"><span class="legend-dot" style="background:${style.color}"></span>${style.label}</div>
+  `).join('');
+  mapLegend.innerHTML = categoryLegend + insightLegend;
+
+  registry.innerHTML = `
+    <h4>Evidence Pins</h4>
+    <p>Click any pin on the map or any row here to open the source-backed explanation.</p>
+    ${gabesInsightPins.map(pin => {
+      const style = GABES_INSIGHT_STYLES[pin.level];
+      return `
+        <div class="map-location-item" data-pin-id="${pin.id}">
+          <div class="map-location-dot" style="background:${style.color}"></div>
+          <div class="map-location-text">
+            <strong>${pin.title}</strong>
+            <span>${style.label} · ${pin.summary}</span>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  const tooltip = cityMap.querySelector('#map-pin-tooltip');
+
+  function showPinTooltip(pinId) {
+    const pin = gabesInsightPins.find(item => item.id === pinId);
+    const marker = cityMap.querySelector(`[data-pin-id="${pinId}"]`);
+    if (!pin || !marker || !tooltip) return;
+    const style = GABES_INSIGHT_STYLES[pin.level];
+    const left = (pin.x / 860) * cityMap.clientWidth;
+    const top = (pin.y / 560) * cityMap.clientHeight;
+    tooltip.innerHTML = `
+      <div class="tooltip-kicker" style="color:${style.color}">${style.kicker}</div>
+      <h5>${pin.title}</h5>
+      <p>${pin.summary}</p>
+      <div class="map-source-row">
+        <span>Sources</span>
+        ${pin.sources.map(source => `<a href="${source.url}" target="_blank" rel="noopener noreferrer">${source.label}</a>`).join('')}
+      </div>
+    `;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${Math.min(cityMap.clientWidth - 300, Math.max(12, left + 16))}px`;
+    tooltip.style.top = `${Math.min(cityMap.clientHeight - 170, Math.max(12, top - 24))}px`;
+    tooltip.style.borderColor = `${style.color}`;
+  }
+
+  cityMap.querySelectorAll('[data-pin-id]').forEach(node => {
+    node.addEventListener('click', event => {
+      event.stopPropagation();
+      showPinTooltip(node.dataset.pinId);
+    });
+    node.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        showPinTooltip(node.dataset.pinId);
+      }
+    });
+  });
+
+  cityMap.addEventListener('click', event => {
+    if (!event.target.closest('[data-pin-id]')) {
+      tooltip.style.display = 'none';
+    }
+  });
+
+  registry.querySelectorAll('[data-pin-id]').forEach(node => {
+    node.addEventListener('click', () => showPinTooltip(node.dataset.pinId));
+  });
+
+  cityMap.dataset.ready = 'true';
+}
+
+renderGabesMap();
+
+window.focusLandmark = function(idx) {
+  if (idx >= landmarks.length) return;
+  const lm = landmarks[idx];
+  targetPanX = lm.pos.x;
+  targetPanZ = lm.pos.z;
+  targetRadius = 200;
+  targetPhi = 0.8;
+};
+
+window.toggleMap = function(show) {
+  const overlay = document.getElementById('map-overlay');
+  const isVisible = overlay.style.display === 'flex';
+  renderGabesMap();
+  if (typeof show === 'boolean') {
+    overlay.style.display = show ? 'flex' : 'none';
+  } else {
+    overlay.style.display = isVisible ? 'none' : 'flex';
+  }
+  overlay.setAttribute('aria-hidden', overlay.style.display !== 'flex');
+};
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    window.toggleMap();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ANIMATE WATER
+// ═══════════════════════════════════════════════════════════════════════
+function animateWater(t) {
+  waterTex.offset.x = t * 0.008;
+  waterTex.offset.y = t * 0.004;
+  waterTex.needsUpdate = true;
+  shore.material.opacity = 0.4 + 0.2 * Math.sin(t * 1.5);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════════════════════════════════════
+let frameCount = 0;
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const elapsed = clock.getElapsedTime();
+  frameCount++;
+
+  // Smooth camera lerp
+  theta += (targetTheta - theta) * 0.07;
+  phi += (targetPhi - phi) * 0.07;
+  radius += (targetRadius - radius) * 0.07;
+  panX += (targetPanX - panX) * 0.07;
+  panZ += (targetPanZ - panZ) * 0.07;
+
+  camera.position.x = panX + radius * Math.sin(phi) * Math.sin(theta);
+  camera.position.y = radius * Math.cos(phi);
+  camera.position.z = panZ + radius * Math.sin(phi) * Math.cos(theta);
+  camera.lookAt(panX, 0, panZ);
+
+  // Gentle sun swing
+  sunLight.position.x = -300 + Math.sin(elapsed * 0.05) * 100;
+  sunLight.position.z = 200 + Math.cos(elapsed * 0.05) * 80;
+
+  animateWater(elapsed);
+  renderer.render(scene, camera);
+
+  // Loading complete
+  if (frameCount === 5) {
+    const fill = document.getElementById('progress-fill');
+    fill.style.width = '100%';
+    setTimeout(() => {
+      const loading = document.getElementById('loading');
+      loading.style.opacity = '0';
+      setTimeout(() => loading.style.display = 'none', 800);
+    }, 400);
+  } else if (frameCount < 5) {
+    document.getElementById('progress-fill').style.width = (frameCount * 18) + '%';
+  }
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+
+// Start
+animate();
+</script>
+</body>
+</html>
