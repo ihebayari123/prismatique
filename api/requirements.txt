@@ -1,0 +1,13 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pillow>=10.0
+numpy>=1.23
+python-multipart>=0.0.9
+# TensorFlow is large and version-sensitive on Windows.
+# If install issues happen, try Python 3.10 + tensorflow==2.15.*
+# or use the on-device TFLite path described in api/README.md
+# TensorFlow wheels typically support Python 3.11; Python 3.13/3.14 often won't work.
+tensorflow==2.15.*; python_version < "3.12"
+# The bundled TensorFlow loader may not understand these Keras 3-style .h5 files.
+# After installing this file, also run:
+#   pip install "keras>=3,<4" --no-deps
